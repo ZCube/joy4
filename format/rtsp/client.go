@@ -60,7 +60,8 @@ type Client struct {
 	url        *url.URL
 	conn       *connWithTimeout
 	brconn      *bufio.Reader
-	requestUri string
+	requestUri  string
+	contentBase string
 	cseq       uint
 	streams    []*Stream
 	streamsintf []av.CodecData
@@ -590,9 +591,12 @@ func (self *Client) Setup(idx []int) (err error) {
 		control := self.streams[si].Sdp.Control
 		if strings.HasPrefix(control, "rtsp://") {
 			uri = control
+		} else if self.contentBase != "" {
+			uri = self.contentBase + "/" + control
 		} else {
 			uri = self.requestUri + "/" + control
 		}
+        
 		req := Request{Method: "SETUP", Uri: uri}
 		req.Header = append(req.Header, fmt.Sprintf("Transport: RTP/AVP/TCP;unicast;interleaved=%d-%d", si*2, si*2+1))
 		if self.session != "" {
@@ -647,6 +651,9 @@ func (self *Client) Describe() (streams []sdp.Media, err error) {
 		fmt.Println("<", body)
 	}
 
+	if cb := res.Headers.Get("Content-Base"); cb != "" {
+        self.contentBase = strings.Trim(cb, "/")
+	}
 	_, medias := sdp.Parse(body)
 
 	self.streams = []*Stream{}
